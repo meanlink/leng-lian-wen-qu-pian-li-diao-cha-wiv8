@@ -8,3 +8,14 @@ class JobStatus(str, Enum):
     running = 'running'
     completed = 'completed'
     failed = 'failed'
+class SensitivityStatus(str, Enum):
+    queued = 'queued'
+    running = 'running'
+    completed = 'completed'
+    blocked = 'blocked'
+    switched = 'switched'
+class TierStatus(str, Enum):
+    pending = 'pending'
+    running = 'running'
+    completed = 'completed'
+    failed = 'failed'

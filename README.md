@@ -4,7 +4,8 @@
 
 ## 模块与业务流程
 数据接入（JSON/CSV、字段验证、批次指纹）→ 参数化分析（异步 Python worker）→ 结果复核（指标、图形、明细、解释、批准）→ 定时分发（本地收件箱、CSV/JSON、SHA256）；另有业务总览和审计轨迹。
-三个贯穿全栈的实体：Dataset 数据批次、Job 分析任务、Report 分发计划；辅助 User、Audit、Delivery。
+温区上界敏感性调查贯穿同一套后端：创建时锁定批次与参数指纹，worker 逐档计算并可断点续算，任一档失败即整项阻塞，负责人确认口径未漂移后按同一版本一次性切换并生成不可变版本简报。
+三个核心实体：Dataset 数据批次、Job 分析任务、Report 分发计划；辅助 User、Audit、Delivery；新增 SensitivityRun 调查项、SensitivityTier 逐档结果、SensitivityBrief 版本简报。
 
 ## 快速启动
 ```bash
@@ -29,12 +30,13 @@ Python 3.12 / FastAPI / SQLAlchemy / NumPy / SciPy / scikit-learn；MySQL 8.0；
 ## 目录与工程约定
 backend/src/{models,schemas,services,routes,controllers,middlewares,constants,config,utils}；backend/scripts/seed_demo.py；backend/migrations/initial.py。
 frontend/src/{api,stores,types,components/common,hooks,pages,router,utils,constants}。
-Role 枚举：admin/analyst/viewer；JobStatus：queued/running/completed/failed。后端 backend/src/constants/enums.py，前端 frontend/src/constants/enums.js；路由权限在 middlewares/auth.py；页面按相同角色控制操作入口。
+Role 枚举：admin/analyst/viewer；JobStatus：queued/running/completed/failed；SensitivityStatus：queued/running/completed/blocked/switched，TierStatus：pending/running/completed/failed。后端 backend/src/constants/enums.py，前端 frontend/src/constants/enums.js；路由权限在 middlewares/auth.py；页面按相同角色控制操作入口（敏感性调查：analyst/admin 可创建与重试，仅 admin 可确认切换，viewer 只读）。
 
 ## 环境变量与 Docker
 COMPOSE_PROJECT_NAME=cold-excursion；FRONTEND_PORT=18201；BACKEND_PORT=19201；DB_PORT=17701；DB_PASSWORD、JWT_SECRET 见 .env.example；SEED_DEMO 默认 true。共享命名产物卷供后端下载与 worker 写入，数据库/Redis 各持久卷。
 恰好五服务均有健康检查。Redis 队列加 SQL 排队状态兜底；worker 按 next_run 生成本地收件箱文件。周期 60 秒至 30 天。分发结果为批准分析的固定快照；若需新数据重新计算并建立新计划。当前不连接邮件或企业聊天。
 错误响应、请求编号、Redis 每 IP 每分钟 240 次限流、JWT 和数据库操作审计。演示密钥与密码仅供本机模拟；生产部署前配置独立密钥与账号。
+敏感性调查使用独立 Redis 队列 `sensitivity:queue` 加 SQL `queued` 状态兜底；worker 启动时把卡在 `running` 的调查项重置为 `queued`，续算时跳过已完成档位。
 
 ## 数据与验收
 所有数据为固定随机种子生成的模拟业务数据，不能作为实际生产决策证据。项目独立算法、输入边界及业务局限详见 BUSINESS.md。测试与截图统一存放 ../../test-artifacts/gb-1002/，源码不含日志/截图/测试报告。
